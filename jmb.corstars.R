@@ -1,12 +1,16 @@
 gCompanyForms <- c(",","llc", "corp", "inc.", "inc", "incorporated", "co.", "pllc", "ltd", "ltd.")
 
 
-jmb.diagnostics <- function(df, filename="filename"){
+jmb.diagnostics <- function(df, filename="filename",dummiesStartAt=0){
   
   library(psych)
   library(gridExtra)
   
-  dateS <- today()
+  #drop dummies if requested
+  if(dummiesStartAt != 0){
+    df <- df[,1:dummiesStartAt]
+  }
+  
   pdf(file=paste(filename, ".pdf", sep = ""))
   
   missing.values <- df %>%
@@ -35,22 +39,41 @@ jmb.diagnostics <- function(df, filename="filename"){
            'Variable', y = "% of missing values")
   
   print(percentage.plot)
+ 
   
   #print(plot(1:10,1:10,main=paste("This pdf was generated from the jmb.diagnostics function",paste("On ", dateS),sep="\n")))
   for(i in names(df)){
     
     df$winsored <- winsor(df[,i], 0.05)
+    df$logged <- log(df[,i]+1)
     g1 <- ggplot(df, aes_string(x=i)) + 
-      geom_histogram(aes(y=(..count..)/sum(..count..)), colour="black", fill="white")+
+      geom_histogram(aes(y=(..count..)/sum(..count..)), colour="black", fill="white") +
       #geom_density(alpha=.2, fill="#FF6666") + 
-      labs(title = paste(i, " - Missing: ", sum(is.na(df[,1])), " out of ", nrow(df)), x =
+      labs(title = i, subtitle = paste("Missing: ", sum(is.na(df[,1])), " out of ", nrow(df)), x =
              paste('Variable:', i), y = "Percent of Total")
+    g1q <- ggplot(df, aes(sample = df[,i])) +
+      stat_qq() +
+      stat_qq_line()
+    
     g2 <- ggplot(df, aes(x=winsored)) + 
       geom_histogram(aes(y=(..count..)/sum(..count..)), colour="black", fill="white")+
       #geom_density(alpha=.2, fill="#FF6666") + 
-      labs(title = paste(i, " - Missing: ", sum(is.na(df[,1])), " out of ", nrow(df)), x =
-             paste('Winsored (0.05) Variable', i), y = "Density")
-    grid.arrange(g1, g2)
+      labs(title = paste("(winsor)",i), subtitle = paste("Missing: ", sum(is.na(df[,1])), " out of ", nrow(df)), x =
+             paste('Winsored (0.05) Variable', i), y = "Percent of Total")
+    g2q <- ggplot(df, aes(sample = winsored)) +
+      stat_qq() +
+      stat_qq_line()
+    
+    g3 <- ggplot(df, aes(x=logged)) + 
+      geom_histogram(aes(y=(..count..)/sum(..count..)), colour="black", fill="white")+
+      #geom_density(alpha=.2, fill="#FF6666") + 
+      labs(title = paste("(log)", i), subtitle = paste("Missing: ", sum(is.na(df[,1])), " out of ", nrow(df)), x =
+             paste('Logged Variable', i), y = "Percent of Total")
+    g3q <- ggplot(df, aes(sample = logged)) +
+      stat_qq() +
+      stat_qq_line()
+    
+    grid.arrange(g1, g1q, g2, g2q, g3, g3q, ncol=2)
     #hist(df[,i], col="darkgreen",main=paste("Variable: ",i), xlab=i)
            
   }
@@ -104,7 +127,7 @@ jmb.builddummies <- function(df){
       toDummyVector <- c(toDummyVector, colnames(df[i]))
     }
   }
-  df <- as.data.frame(dummy.data.frame(df, toDummyVector))
+  df <- as.data.frame(dummy.data.frame(df, toDummyVector, sep="_"))
   return(df)
 }
 
@@ -115,7 +138,7 @@ jmb.gcn <- function(colNames, df){
 
 
 #adapted from https://github.com/Cogitos/statxp/blob/master/R/corstars.R
-jmb.corstars <-function(x, method=c("pearson", "spearman"), fileName){
+jmb.corstars <-function(x, method=c("pearson", "spearman"), fileName, dummiesStartAt=0){
   if(fileName == ""){
     fileName="cor.html"
   }
@@ -126,13 +149,14 @@ jmb.corstars <-function(x, method=c("pearson", "spearman"), fileName){
   if(!require(xtable)) install.packages("xtable")
   library(xtable)
   if(!require(tidyverse)) install.packages("tidyverse")
-  
+  library(ggcorrplot)
+  if(!require(ggcorrplot)) install.packages("ggcorrplot")
   #anyone not a numeric?
   #pull out factors/characters
   # y <- select_if(x, negate(is.numeric))
   
   #this method converts
-  x <- data.frame(sapply(x, function(z) as.numeric(as.character(z))))
+  #x <- data.frame(sapply(x, function(z) as.numeric(as.character(z))))
   #this method returns the numerics 
   #x <- select_if(x, is.numeric)
   
@@ -194,10 +218,27 @@ jmb.corstars <-function(x, method=c("pearson", "spearman"), fileName){
   code <- print(xtable(Rnew), type="html")
   
   write.table(code, 
-              file=fileName, 
+              file=paste(fileName, ".html", sep=""), 
               quote = FALSE,
               col.names = FALSE,
               row.names = FALSE)
+  
+  R.int <- as.data.frame(R, stringsAsFactors = FALSE)
+ 
+   #dropping any dummies?
+  if(dummiesStartAt != 0){ R.int <- R.int[1:dummiesStartAt,] }
+  
+  for(i in names(R.int)){ #convert characters to numeric
+    R.int[,i] <- as.numeric(R.int[,i]) 
+  }
+  
+  ggcorrplot(R.int, hc.order = TRUE, 
+             type = "lower", 
+             lab = TRUE, 
+             lab_size = 3, 
+             colors = c("#6D9EC1", "white", "#E46726"), 
+             title="Correlogram")
+  ggsave(paste(fileName, ".png", sep=""), width=10, height=10)
 }
 
 
