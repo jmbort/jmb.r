@@ -1,6 +1,26 @@
 gCompanyForms <- c(",","llc", "corp", "inc.", "inc", "incorporated", "co.", "pllc", "ltd", "ltd.")
 
 
+jmb.isentre <- function(text){
+  
+  if( grepl(tolower("Self"),tolower(text)) ){
+    return("Y")
+  }else if (grepl(tolower("Self"),tolower(text))){
+    return("Y")
+  }else if (grepl(tolower("Entre"),tolower(text))){
+    return("Y")
+  }else if (grepl(tolower("Free"),tolower(text))){
+    return("Y")
+  }else if (grepl(tolower("owner"),tolower(text))){
+    return("Y")
+  }else if (grepl(tolower("founder"),tolower(text))){
+    return("Y")
+  }else{
+    return("N")
+  }
+}
+
+
 jmb.diagnostics <- function(df, filename="filename",dummiesStartAt=0){
   
   library(psych)
@@ -11,8 +31,9 @@ jmb.diagnostics <- function(df, filename="filename",dummiesStartAt=0){
     df <- df[,1:dummiesStartAt]
   }
   
-  pdf(file=paste(filename, ".pdf", sep = ""))
-  
+  dir.create("jmb.diagnostics")
+  pdf(file=paste("jmb.diagonostics\\", filename, ".pdf", sep = ""))
+
   missing.values <- df %>%
     gather(key = "key", value = "val") %>%
     mutate(isna = is.na(val)) %>%
@@ -37,9 +58,9 @@ jmb.diagnostics <- function(df, filename="filename",dummiesStartAt=0){
     coord_flip() +
     labs(title = "Percentage of missing values", x =
            'Variable', y = "% of missing values")
-  
+  #ggsave(paste("jmb.diagnostics\\", filename, "-misssings", ".png", sep = ""), percentage.plot)
   print(percentage.plot)
- 
+  
   
   #print(plot(1:10,1:10,main=paste("This pdf was generated from the jmb.diagnostics function",paste("On ", dateS),sep="\n")))
   for(i in names(df)){
@@ -74,8 +95,8 @@ jmb.diagnostics <- function(df, filename="filename",dummiesStartAt=0){
       stat_qq_line()
     
     grid.arrange(g1, g1q, g2, g2q, g3, g3q, ncol=2)
-    #hist(df[,i], col="darkgreen",main=paste("Variable: ",i), xlab=i)
-           
+    #gr <- arrangeGrob(g1, g1q, g2, g2q, g3, g3q, ncol=2)
+    #ggsave(paste("jmb.diagnostics\\", filename, "-", colnames(df)[i], ".png", sep = ""), gr)
   }
   dev.off()
 }
